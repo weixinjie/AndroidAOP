@@ -48,7 +48,8 @@ public class TracePlugin extends Transform implements Plugin<Project> {
 
     @Override
     void transform(Context context, Collection<TransformInput> inputs, Collection<TransformInput> referencedInputs,
-                   TransformOutputProvider outputProvider, boolean isIncremental) throws IOException, TransformException, InterruptedException {
+                   TransformOutputProvider outputProvider, boolean isIncremental)
+            throws IOException, TransformException, InterruptedException {
         println '//===============TracePlugin visit start===============//'
         //删除之前的输出
         if (outputProvider != null)
