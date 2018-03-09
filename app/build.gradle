@@ -1,5 +1,5 @@
 apply plugin: 'com.android.application'
-
+apply plugin: 'will.github.com.traceplugin'
 android {
     compileSdkVersion 26
     defaultConfig {
