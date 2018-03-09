@@ -5,6 +5,7 @@ buildscript {
     repositories {
         google()
         jcenter()
+        //TODO 需要更换成你自己的路径
         maven {
             url 'file:///Users/will/Android_DownLoad_Demo/AndroidAOP/traceplugin'
         }

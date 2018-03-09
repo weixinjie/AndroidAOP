@@ -8,38 +8,52 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.AdviceAdapter;
 
 /**
- * 方法耗时 visitor
- * Author: lwh
- * Date: 4/28/17 15:37.
+ * 对继承自AppCompatActivity的Activity进行插桩
  */
 
 public class TraceVisitor extends ClassVisitor {
 
+    /**
+     * 类名
+     */
     private String className;
+
+    /**
+     * 父类名
+     */
     private String superName;
+
+    /**
+     * 该类实现的接口
+     */
     private String[] interfaces;
 
     public TraceVisitor(String className, ClassVisitor classVisitor) {
         super(Opcodes.ASM5, classVisitor);
     }
 
+    /**
+     * ASM进入到类的方法时进行回调
+     *
+     * @param access
+     * @param name       方法名
+     * @param desc
+     * @param signature
+     * @param exceptions
+     * @return
+     */
     @Override
     public MethodVisitor visitMethod(final int access, final String name, final String desc, final String signature,
                                      String[] exceptions) {
         MethodVisitor methodVisitor = cv.visitMethod(access, name, desc, signature, exceptions);
         methodVisitor = new AdviceAdapter(Opcodes.ASM5, methodVisitor, access, name, desc) {
 
-
-            private TraceType isInject() {
-                if (!className.contains("1905") || className.contains("BaseActivity")) {
-                    return TraceType.NULL;
+            private boolean isInject() {
+                //如果父类名是AppCompatActivity则拦截这个方法,实际应用中可以换成自己的父类例如BaseActivity
+                if (superName.contains("AppCompatActivity")) {
+                    return true;
                 }
-                if (name.contains("onClick") && desc.equals("(Landroid/view/View;)V")) {
-                    return TraceType.ONCLICK;
-                } else if (superName.contains("Activity")) {
-                    return TraceType.ACTIVITY;
-                }
-                return TraceType.NULL;
+                return false;
             }
 
             @Override
@@ -59,58 +73,54 @@ public class TraceVisitor extends ClassVisitor {
             }
 
 
+            /**
+             * 方法开始之前回调
+             */
             @Override
             protected void onMethodEnter() {
-                //统计方法耗时
-                switch (isInject()) {
-                    case NULL:
-                        break;
-                    case ONCLICK:
-                        mv.visitVarInsn(ALOAD, 1);
-                        mv.visitMethodInsn(INVOKESTATIC
-                                , "com/m1905/mobilefree/trace/TraceUtil"
-                                , "onViewClick"
-                                , "(Landroid/view/View;)Z"
-                                , false);
-                        Label l1 = new Label();
-                        mv.visitJumpInsn(IFNE, l1);
-                        mv.visitInsn(RETURN);
-                        mv.visitLabel(l1);
-                        break;
-                    case ACTIVITY:
-                        if (name.equals("onDestroy")) {
-                            mv.visitVarInsn(ALOAD, 0);
-                            mv.visitMethodInsn(INVOKESTATIC, "com/m1905/mobilefree/trace/TraceUtil", "onActivityDestroy", "(Landroid/app/Activity;)V", false);
-                        } else if (name.equals("onCreate")) {
-                            System.out.println("执行onCreate方法" + name + desc + superName + className);
-                            mv.visitVarInsn(ALOAD, 0);
-                            mv.visitMethodInsn(INVOKESTATIC, "com/m1905/mobilefree/trace/TraceUtil", "onActivityCreate", "(Landroid/app/Activity;)V", false);
-                        }
-                        break;
-                    case FRAGMENT:
-                        break;
+                if (isInject()) {
+                    if ("onCreate".equals(name)) {
+                        mv.visitVarInsn(ALOAD, 0);
+                        mv.visitMethodInsn(INVOKESTATIC,
+                                "will/github/com/androidaop/traceutils/TraceUtil",
+                                "onActivityCreate", "(Landroid/app/Activity;)V",
+                                false);
+                    } else if ("onDestroy".equals(name)) {
+                        mv.visitVarInsn(ALOAD, 0);
+                        mv.visitMethodInsn(INVOKESTATIC, "will/github/com/androidaop/traceutils/TraceUtil"
+                                , "onActivityDestroy", "(Landroid/app/Activity;)V", false);
+                    }
                 }
             }
 
+            /**
+             * 方法结束时回调
+             * @param i
+             */
             @Override
             protected void onMethodExit(int i) {
                 super.onMethodExit(i);
             }
         };
         return methodVisitor;
-        //return super.visitMethod(i, s, s1, s2, strings);
 
     }
 
+    /**
+     * 当ASM进入类时回调
+     *
+     * @param version
+     * @param access
+     * @param name       类名
+     * @param signature
+     * @param superName  父类名
+     * @param interfaces 实现的接口名
+     */
     @Override
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
         super.visit(version, access, name, signature, superName, interfaces);
         this.className = name;
         this.superName = superName;
         this.interfaces = interfaces;
-//        System.out.println("类名  " + className + "  父类名: " + superName);
-//        for (int i = 0; i < interfaces.length; i++) {
-//            System.out.println("类名  " + className + "  实现的接口名: " + interfaces[i]);
-//        }
     }
 }
