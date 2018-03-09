@@ -1,6 +1,5 @@
-package com.github.will.traceplugin;
+package will.github.com.traceplugin;
 
-import org.gradle.internal.impldep.com.fasterxml.jackson.databind.node.BooleanNode;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Label;
@@ -31,8 +30,16 @@ public class TraceVisitor extends ClassVisitor {
         methodVisitor = new AdviceAdapter(Opcodes.ASM5, methodVisitor, access, name, desc) {
 
 
-            private boolean isInject() {
-                return false;
+            private TraceType isInject() {
+                if (!className.contains("1905") || className.contains("BaseActivity")) {
+                    return TraceType.NULL;
+                }
+                if (name.contains("onClick") && desc.equals("(Landroid/view/View;)V")) {
+                    return TraceType.ONCLICK;
+                } else if (superName.contains("Activity")) {
+                    return TraceType.ACTIVITY;
+                }
+                return TraceType.NULL;
             }
 
             @Override
@@ -54,15 +61,45 @@ public class TraceVisitor extends ClassVisitor {
 
             @Override
             protected void onMethodEnter() {
-
+                //统计方法耗时
+                switch (isInject()) {
+                    case NULL:
+                        break;
+                    case ONCLICK:
+                        mv.visitVarInsn(ALOAD, 1);
+                        mv.visitMethodInsn(INVOKESTATIC
+                                , "com/m1905/mobilefree/trace/TraceUtil"
+                                , "onViewClick"
+                                , "(Landroid/view/View;)Z"
+                                , false);
+                        Label l1 = new Label();
+                        mv.visitJumpInsn(IFNE, l1);
+                        mv.visitInsn(RETURN);
+                        mv.visitLabel(l1);
+                        break;
+                    case ACTIVITY:
+                        if (name.equals("onDestroy")) {
+                            mv.visitVarInsn(ALOAD, 0);
+                            mv.visitMethodInsn(INVOKESTATIC, "com/m1905/mobilefree/trace/TraceUtil", "onActivityDestroy", "(Landroid/app/Activity;)V", false);
+                        } else if (name.equals("onCreate")) {
+                            System.out.println("执行onCreate方法" + name + desc + superName + className);
+                            mv.visitVarInsn(ALOAD, 0);
+                            mv.visitMethodInsn(INVOKESTATIC, "com/m1905/mobilefree/trace/TraceUtil", "onActivityCreate", "(Landroid/app/Activity;)V", false);
+                        }
+                        break;
+                    case FRAGMENT:
+                        break;
+                }
             }
 
             @Override
             protected void onMethodExit(int i) {
-
+                super.onMethodExit(i);
             }
         };
         return methodVisitor;
+        //return super.visitMethod(i, s, s1, s2, strings);
+
     }
 
     @Override
